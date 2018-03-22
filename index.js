@@ -3,10 +3,10 @@ var http = require('http');
 var app = express();
 var multer  = require('multer')
 var engine = require('ejs-locals');
-var mysql = require('mysql');
 var bodyParser = require('body-parser')
-app.use(bodyParser.urlencoded({ extended: true }));
+var Sequelize = require('sequelize');
 
+app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static('public'));
 http.createServer(app).listen(process.env.PORT || 3000);
 
@@ -24,25 +24,35 @@ var storage = multer.diskStorage({
 })
 var upload = multer({ storage: storage })
 
-var con = mysql.createConnection({
-  host: "localhost",
-  user: "root",
-  password: "123456",
-  database: "imageshare"
+var sequelize = new Sequelize('imageshare', 'postgres', '123456', {
+  host: 'localhost',
+  dialect: 'postgres',
+  operatorsAliases: false,
+  define: {
+    timestamps: false,
+  }
 });
 
-con.connect(function(err) {
-  if (err) throw err
+sequelize
+  .authenticate()
+  .then(() => {
+    console.log('Connection has been established successfully.');
+  })
+  .catch(err => {
+    console.error('Unable to connect to the database:', err);
+  });
+
+var Image = sequelize.define('image', {
+  id: {type: Sequelize.INTEGER, primaryKey: true, autoIncrement: true},
+  title:Sequelize.STRING,
+  name: Sequelize.STRING,
 });
+
+sequelize.sync().then(() => {});
 
 app.get ("/", function(require, response){
-  con.query("SELECT * FROM images", function(err, result, fields){
-    if(err){
-      response.end();
-      return console.error("loi query", err);
-    }else{
-      response.render('index', {data: result});
-    }
+  Image.findAll().then(images => {
+    response.render('index', {data: images});
   });
 })
 
@@ -56,61 +66,54 @@ app.get ("/images/new", function(require, response){
 
 app.post('/images/upload', upload.single('image'), function (req, res, next) {
   if(req.file == undefined){
-    res.send("hay nhap file")
+    res.render('images/new')
+    console.log("hay nhap file")
   }else{
-    con.query("INSERT INTO images (title, name) VALUES ('"+ req.body.title + "','" + req.file.originalname + "')", function(err, result){
-      if(err){
-        console.error("loi query", err);
-        res.send("loi query");
-      }
+    Image.create({title: req.body.title, name: req.file.originalname}).then(function (image) {
       res.redirect('/')
-    });
+   }).catch(error => {
+    response.send("loi query" + error);
+  })
   }
 })
 
 app.get ("/admin/images", function(require, response){
-  con.query("SELECT * FROM images", function(err, result, fields){
-    if(err){
-      response.end();
-      return console.error("loi query", err);
-    }else{
-      response.render('admin/images/index', {data: result});
-    }
+  Image.findAll().then(images => {
+    response.render('admin/images/index', {data: images});
+  }).catch(error => {
+    response.send("loi query" + error);
   });
 })
 
 app.get ("/admin/images/delete/:id", function(require, response){
-  con.query("DELETE FROM images WHERE id = '" + require.params.id + "'", function(err, result, fields){
-    if(err){
-      response.send("loi query", err);
-    }else{
-      response.redirect('/admin/images')
+  Image.destroy({
+    where: {
+      id: require.params.id
     }
   });
+  response.redirect('/admin/images')
 })
 
 app.get ("/admin/images/:id", function(require, response){
-  con.query("SELECT * FROM images WHERE id = '" + require.params.id + "'", function(err, result, fields){
-    if(err){
-      response.send("loi query", err);
-    }else{
-      response.render('admin/images/edit', {data: result[0]})
-    }
-  });
+  Image.findById(require.params.id).then(image => {
+    response.render('admin/images/edit', {data: image})
+  }).catch(error => {
+    response.send("loi query" + error);
+  })
 })
 
 app.post ("/admin/images/:id", upload.single('image'), function(require, response){
-  if(require.file == undefined){
-    var sql = "UPDATE images SET title = '" + require.body.title + "' WHERE id = '" + require.params.id + "'";
-  }else{
-    var sql = "UPDATE images SET title = '"+ require.body.title + "', name = '" + require.file.originalname + "' WHERE id = " + require.params.id + "";
-  }
-  con.query(sql, function(err, result, fields){
-    if(err){
-      console.error("loi query", err);
-      response.send("loi query");
-    }else{
-      response.redirect('/admin/images')
+  Image.findById(require.params.id).then(image => {
+    image.title = require.body.title
+    if(require.file != undefined){
+      image.name = require.file.originalname
     }
+    image.save().then(() => {
+      response.redirect('/admin/images')
+    }).catch(error => {
+      response.send("loi update" + error);
+    })
+  }).catch(error => {
+    response.send("Image khong ton tai" + error);
   });
 })
