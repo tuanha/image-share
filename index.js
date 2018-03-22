@@ -5,6 +5,7 @@ var multer  = require('multer')
 var engine = require('ejs-locals');
 var bodyParser = require('body-parser')
 var Sequelize = require('sequelize');
+var db = require('./models');
 
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static('public'));
@@ -24,16 +25,7 @@ var storage = multer.diskStorage({
 })
 var upload = multer({ storage: storage })
 
-var sequelize = new Sequelize('imageshare', 'postgres', '123456', {
-  host: 'localhost',
-  dialect: 'postgres',
-  operatorsAliases: false,
-  define: {
-    timestamps: false,
-  }
-});
-
-sequelize
+db.sequelize
   .authenticate()
   .then(() => {
     console.log('Connection has been established successfully.');
@@ -42,13 +34,13 @@ sequelize
     console.error('Unable to connect to the database:', err);
   });
 
-var Image = sequelize.define('image', {
+var Image = db.sequelize.define('image', {
   id: {type: Sequelize.INTEGER, primaryKey: true, autoIncrement: true},
   title:Sequelize.STRING,
   name: Sequelize.STRING,
 });
 
-sequelize.sync().then(() => {});
+db.sequelize.sync().then(() => {});
 
 app.get ("/", function(require, response){
   Image.findAll().then(images => {
