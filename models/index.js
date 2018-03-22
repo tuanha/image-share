@@ -10,7 +10,7 @@ var db        = {};
 
 if (config.use_env_variable) {
   if (process.env.HEROKU_POSTGRESQL_BRONZE_URL) {
-    sequelize = new Sequelize(process.env.HEROKU_POSTGRESQL_BRONZE_URL, {
+    sequelize = new Sequelize(process.env.DATABASE_URL, {
       dialect:  'postgres',
       protocol: 'postgres',
       port:     match[4],
